@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -56,6 +56,8 @@ class Program
 
         string date; // Current date for report file naming
 
+        string directory; // Directory path for data file
+
         string reportFile; // Report file name for exporting all students
 
         string searchID; // Student ID for searching individual records
@@ -69,6 +71,14 @@ class Program
         string line; // Current line being processed
 
         string g1, g2, g3; // Grade strings for parsing
+
+        string section; // Section identifier for report file (e.g., A, B, C)
+
+        string updatedLine; // Updated line for writing to the report file
+
+        string sectionFolder; // Folder path for section-specific reports
+
+        string sectionFile; // File path for section-specific reports
 
         // ----- Double Variables -----
 
@@ -115,6 +125,8 @@ class Program
         HashSet<string> existingStudents; // HashSet to track existing student IDs
 
         HashSet<string> currentBulkIDs; // HashSet to track IDs in current bulk operation
+
+        HashSet<string> sectionsWritten; // HashSet to track sections already written in the report file
 
         // ----- String Array Variables -----
 
@@ -405,7 +417,7 @@ class Program
                                         try
                                         {
                                             // Ensure directory exists before writing
-                                            string directory = Path.GetDirectoryName(dataPath);
+                                           directory = Path.GetDirectoryName(dataPath);
 
                                             if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
                                             {
@@ -416,6 +428,25 @@ class Program
                                             using (StreamWriter sw = new StreamWriter(dataPath, true))
                                             {
                                                 sw.WriteLine(record);
+                                            }
+
+                                            // Extract section from ID (e.g., IT1A005 -> 'A')
+                                            section = id.Substring(3, 1).ToUpper();
+
+                                            // Build section folder and file path
+                                             sectionFolder = Path.Combine("Sections", $"Section{section}");
+                                             sectionFile = Path.Combine(sectionFolder, "grades.csv");
+
+                                            // Ensure section folder exists
+                                            if (!Directory.Exists(sectionFolder))
+                                            {
+                                                Directory.CreateDirectory(sectionFolder);
+                                            }
+
+                                            // Write the same student record to the section-specific CSV file
+                                            using (StreamWriter sectionWriter = new StreamWriter(sectionFile, true))
+                                            {
+                                                sectionWriter.WriteLine(record);
                                             }
 
                                             // Sort the records after adding a new one
@@ -642,7 +673,7 @@ class Program
                                         try
                                         {
                                             // Ensure directory exists before writing
-                                            string directory = Path.GetDirectoryName(dataPath);
+                                           directory = Path.GetDirectoryName(dataPath);
                                             if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
                                             {
                                                 Directory.CreateDirectory(directory);
@@ -798,8 +829,7 @@ class Program
                                     Thread.Sleep(1500);
                                 }
 
-                                // Write CSV header
-                                File.WriteAllText(reportFile, "Student ID,Last Name,First Name,Data Structures,Programming 2,Math Applications in I,Avergae Grade\n");
+                                
 
                                 // Append all student records
 
@@ -808,28 +838,39 @@ class Program
 
                                 // This loop just adds average score column ( does not reflect on case 1)
 
-                                // Process and append each student record
+                                // Use a HashSet to track if a header was already written
+                               sectionsWritten = new HashSet<string>();
+
                                 for (int i = 0; i < records.Length; i++)
                                 {
-                                     parts = records[i].Split(',');
+                                    parts = records[i].Split(',');
 
-                                    if (parts.Length >= 6) // Ensure there are at least 6 fields
+                                    if (parts.Length >= 6)
                                     {
-                                        double Grade1, Grade2, Grade3, Avg; // Initialize grades and average
+                                        double Grade1, Grade2, Grade3, Avg;
+                                        bool valid1 = double.TryParse(parts[3], out Grade1);
+                                        bool valid2 = double.TryParse(parts[4], out Grade2);
+                                        bool valid3 = double.TryParse(parts[5], out Grade3);
 
-                                        //check if grades are valid
-                                        bool valid1 = double.TryParse(parts[3], out Grade1); // Parse Data Structures grade
-                                        bool valid2 = double.TryParse(parts[4], out Grade2); // Parse Programming 2 grade
-                                        bool valid3 = double.TryParse(parts[5], out Grade3); // Parse Math Applications in IT grade
-
-                                        if (valid1 && valid2 && valid3) // print if all grades are valid
+                                        if (valid1 && valid2 && valid3)
                                         {
                                             Avg = (Grade1 + Grade2 + Grade3) / 3;
-                                            string updatedLine = $"{parts[0]},{parts[1]},{parts[2]},{Grade1},{Grade2},{Grade3},{Avg:F2}"; 
+
+                                            section = parts[0].Substring(3, 1).ToUpper(); // Gets 'A', 'B', or 'C' from ID like IT1A001
+
+                                            // Add section header if not already written
+                                            if (!sectionsWritten.Contains(section))
+                                            {
+                                                File.AppendAllText(reportFile, $"\nBSIT 1{section},---------------------,---------------------,---------------------,---------------------,---------------------,---------------------\n");
+                                                sectionsWritten.Add(section);
+                                            }
+
+                                            updatedLine = $"{parts[0]},{parts[1]},{parts[2]},{Grade1},{Grade2},{Grade3},{Avg:F2}";
                                             File.AppendAllText(reportFile, updatedLine + "\n");
                                         }
                                     }
                                 }
+                            
 
 
                                 // Confirm export
