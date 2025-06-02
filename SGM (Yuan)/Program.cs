@@ -86,6 +86,8 @@ class Program
 
         string sectionCsv; // CSV file path for section-specific reports
 
+        string sectionReportDir; // Directory path for section report files
+
         // ----- Double Variables -----
 
         double grade1; // Data Structures grade input
@@ -104,8 +106,8 @@ class Program
 
         // ----- Boolean Variables -----
 
-        bool found; // Flag to check if a student record was found during
-                    // 
+        bool found; // Flag to check if a student record was found during search
+
         bool endProgram; // Flag to control program exit
 
         bool ValidInput; // Flag to check if the input is valid
@@ -872,7 +874,6 @@ class Program
                             searchID = Console.ReadLine().Trim();
                             Console.WriteLine(); // spacing
 
-                            // Read student data
                             try
                             {
                                 allLines = File.ReadAllLines(dataPath);
@@ -882,47 +883,57 @@ class Program
                                 {
                                     p = searchLine.Split(',');
 
-                                    if (p.Length == 6 && p[0] == searchID) // Check if the line has 6 parts and matches the search ID
+                                    if (p.Length == 6 && p[0] == searchID)
                                     {
                                         found = true;
-
-                                        lastName = p[1].Trim(); // Access last name and trim whitespace
-                                        firstName = p[2].Trim(); // Access first name and trim whitespace
-
-                                        id = p[0].Trim(); // Access student ID and trim whitespace
+                                        lastName = p[1].Trim();
+                                        firstName = p[2].Trim();
+                                        id = p[0].Trim();
 
                                         try
                                         {
-                                            grade1 = double.Parse(p[3]); // Access grades and parse to double
-                                            grade2 = double.Parse(p[4]); // Access grades and parse to double
-                                            grade3 = double.Parse(p[5]); // Access grades and parse to double
+                                            grade1 = double.Parse(p[3]);
+                                            grade2 = double.Parse(p[4]);
+                                            grade3 = double.Parse(p[5]);
+                                            avg = (grade1 + grade2 + grade3) / 3;
 
-                                            avg = (grade1 + grade2 + grade3) / 3; // Calculate average grade
+                                            // Extract section from ID (e.g., A from IT1A001)
+                                            if (id.Length < 4)
+                                            {
+                                                Console.ForegroundColor = ConsoleColor.Red;
+                                                Console.WriteLine("Invalid ID format. Cannot determine section.");
+                                                Console.ForegroundColor = ConsoleColor.White;
+                                                break;
+                                            }
 
-                                            // Ensure Report folder exists
+                                            section = id.Substring(3, 1).ToUpper();
+                                            sectionReportDir = Path.Combine("Sections", $"Section{section}", "Report");
+
+                                            //  Ensure Section Report folder exists
                                             try
                                             {
-                                                if (!Directory.Exists("Report"))
+                                                if (!Directory.Exists(sectionReportDir))
                                                 {
-                                                    Directory.CreateDirectory("Report");
+                                                    Directory.CreateDirectory(sectionReportDir);
                                                 }
                                             }
                                             catch (UnauthorizedAccessException)
                                             {
                                                 Console.ForegroundColor = ConsoleColor.Red;
-                                                Console.WriteLine("Access denied: Unable to create Report directory. Please check permissions.");
+                                                Console.WriteLine("Access denied: Unable to create section report directory. Check permissions.");
                                                 Console.ForegroundColor = ConsoleColor.White;
                                                 break;
                                             }
                                             catch (IOException ex)
                                             {
                                                 Console.ForegroundColor = ConsoleColor.Red;
-                                                Console.WriteLine($"Error creating Report directory: {ex.Message}");
+                                                Console.WriteLine($"Error creating section report directory: {ex.Message}");
                                                 Console.ForegroundColor = ConsoleColor.White;
                                                 break;
                                             }
 
-                                            studentFile = $"Report/{lastName}, {firstName}_Grades.csv";
+                                            //  Set file path inside section report folder
+                                            studentFile = Path.Combine(sectionReportDir, $"{lastName}, {firstName}_Grades.csv");
 
                                             try
                                             {
@@ -931,11 +942,9 @@ class Program
                                                     File.Delete(studentFile);
                                                 }
 
-                                                // Write student grade report
                                                 File.AppendAllText(studentFile, $"ID,Name,Data Structures,Programming 2,Math Application in IT,Average Grade\n");
                                                 File.AppendAllText(studentFile,
                                                     $"{id},{firstName} {lastName},{grade1},{grade2},{grade3},{avg:F2}\n");
-
 
                                                 Console.ForegroundColor = ConsoleColor.Green;
                                                 Console.WriteLine("Export successful. File saved to: " + Path.GetFullPath(studentFile) + "\n");
@@ -944,26 +953,26 @@ class Program
                                             catch (UnauthorizedAccessException)
                                             {
                                                 Console.ForegroundColor = ConsoleColor.Red;
-                                                Console.WriteLine("Access denied: Unable to create individual student report. Please check permissions.");
+                                                Console.WriteLine("Access denied: Unable to create student report. Check file permissions.");
                                                 Console.ForegroundColor = ConsoleColor.White;
                                             }
                                             catch (PathTooLongException)
                                             {
                                                 Console.ForegroundColor = ConsoleColor.Red;
-                                                Console.WriteLine("File path is too long. Please use shorter names or paths.");
+                                                Console.WriteLine("File path too long. Try shorter names or paths.");
                                                 Console.ForegroundColor = ConsoleColor.White;
                                             }
                                             catch (IOException ex)
                                             {
                                                 Console.ForegroundColor = ConsoleColor.Red;
-                                                Console.WriteLine($"Error creating individual student report: {ex.Message}");
+                                                Console.WriteLine($"Error creating student report: {ex.Message}");
                                                 Console.ForegroundColor = ConsoleColor.White;
                                             }
                                         }
                                         catch (FormatException)
                                         {
                                             Console.ForegroundColor = ConsoleColor.Red;
-                                            Console.WriteLine("Error: Invalid grade format in student record. Data may be corrupted.");
+                                            Console.WriteLine("Invalid grade format. Record may be corrupted.");
                                             Console.ForegroundColor = ConsoleColor.White;
                                         }
                                         break;
@@ -980,7 +989,7 @@ class Program
                             catch (FileNotFoundException)
                             {
                                 Console.ForegroundColor = ConsoleColor.Red;
-                                Console.WriteLine("Student data file not found. Please add students first.");
+                                Console.WriteLine("Student data file not found. Add students first.");
                                 Console.ForegroundColor = ConsoleColor.White;
                             }
                             catch (IOException ex)
@@ -993,10 +1002,11 @@ class Program
                         catch (Exception ex)
                         {
                             Console.ForegroundColor = ConsoleColor.Red;
-                            Console.WriteLine($"Unexpected error during individual export: {ex.Message}");
+                            Console.WriteLine($"Unexpected error during export: {ex.Message}");
                             Console.ForegroundColor = ConsoleColor.White;
                         }
                         break;
+
 
                     case "5": // Exit program
                         Console.ForegroundColor = ConsoleColor.Yellow;
