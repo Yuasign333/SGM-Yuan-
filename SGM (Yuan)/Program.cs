@@ -44,6 +44,8 @@ class Program
 
         List<double> grade3List; // List to store Math Application in IT grades
 
+        Dictionary<string, List<string>> sectionMap; // List of dictionary to map sections to student records
+
         // ----- String Variables -----
 
         string input; // User input for menu selection
@@ -79,6 +81,10 @@ class Program
         string sectionFolder; // Folder path for section-specific reports
 
         string sectionFile; // File path for section-specific reports
+
+        string sectionDir; // Directory path for section-specific reports
+
+        string sectionCsv; // CSV file path for section-specific reports
 
         // ----- Double Variables -----
 
@@ -510,12 +516,11 @@ class Program
                         }
                         break;
 
+                    // Enter this in case 2: C:\Users\yuanm\source\repos\SGM (Yuan)\SGM (Yuan)\bin\Debug\Data\bulk.csv
+
                     case "2": // Bulk import from CSV file
                         try
                         {
-
-                            // Enter this in case 2: C:\Users\yuanm\source\repos\SGM (Yuan)\SGM (Yuan)\bin\Debug\Data\bulk.csv
-
                             Console.Write("\nEnter CSV file path: ");
                             filePath = Console.ReadLine();
 
@@ -527,240 +532,195 @@ class Program
                                 break;
                             }
 
-                            // Read existing records to check for duplicates
-                            existingRecords = new string[0];
-                            try
+                            existingRecords = File.Exists(dataPath) ? File.ReadAllLines(dataPath) : new string[0];
+
+                            lines = File.ReadAllLines(filePath);
+                            added = 0;
+                            skipped = 0;
+                            currentBulkIDs = new HashSet<string>();
+
+                            Console.WriteLine();
+
+                            for (int i = 0; i < lines.Length; i++)
                             {
-                                if (File.Exists(dataPath))
+                                line = lines[i].Trim();
+                                if (string.IsNullOrWhiteSpace(line)) continue;
+
+                                parts = line.Split(',');
+                                if (parts.Length != 6)
                                 {
-                                    existingRecords = File.ReadAllLines(dataPath);
-                                }
-                            }
-                            catch (IOException ex)
-                            {
-                                Console.ForegroundColor = ConsoleColor.Red;
-                                Console.WriteLine($"Error reading existing records: {ex.Message}");
-                                Console.ForegroundColor = ConsoleColor.White;
-                                break;
-                            }
-
-                            try
-                            {
-                                lines = File.ReadAllLines(filePath);
-                                added = 0;
-                                skipped = 0;
-
-                              
-
-
-                                // Keep track of IDs being added in this session to avoid duplicates within the bulk file
-                                currentBulkIDs = new HashSet<string>();
-
-                                Console.WriteLine();
-
-                                for (int i = 0; i < lines.Length; i++)
-                                {
-                                    line = lines[i].Trim();
-                                    parts = line.Split(',');
-
-                                    if (string.IsNullOrWhiteSpace(line))
-                                        continue; // skip blank lines
-
-                                    if (parts.Length == 6)
-                                    {
-                                        id = parts[0].Trim();
-                                        lastName = parts[1].Trim();
-                                        firstName = parts[2].Trim();
-
-                                        // Parse grades directly as numbers
-                                        g1 = parts[3].Trim();
-                                        g2 = parts[4].Trim();
-                                        g3 = parts[5].Trim();
-
-                                        // Validate ID format
-                                        idValid = false;
-
-                                        if (id.Length == 7 && id[0] == 'I' && id[1] == 'T' && id[2] == '1' &&
-                                            char.IsLetter(id[3]) && char.IsDigit(id[4]) && char.IsDigit(id[5]) && char.IsDigit(id[6]))
-                                        {
-                                            idValid = true;
-                                        }
-
-                                    
-
-
-                                        if (!idValid)
-                                        {
-                                            skipped++;
-                                            Console.ForegroundColor = ConsoleColor.Red;
-                                            Console.WriteLine($"Line {i + 1} skipped: Invalid student ID format (expected: IT1A005).");
-                                            Console.ForegroundColor = ConsoleColor.White;
-                                            continue;
-                                        }
-
-                                        // Validate names (letters only, proper capitalization)
-                                        nameValid = true;
-                                        if (string.IsNullOrWhiteSpace(lastName) || lastName.Any(char.IsDigit) ||
-                                            !char.IsUpper(lastName[0]) || lastName.Substring(1) != lastName.Substring(1).ToLower() ||
-                                            string.IsNullOrWhiteSpace(firstName) || firstName.Any(char.IsDigit) ||
-                                            !char.IsUpper(firstName[0]) || firstName.Substring(1) != firstName.Substring(1).ToLower())
-                                        {
-                                            nameValid = false;
-                                        }
-
-                                        if (!nameValid)
-                                        {
-                                            skipped++;
-                                            Console.ForegroundColor = ConsoleColor.Red;
-                                            Console.WriteLine($"Line {i + 1} skipped: Invalid name format (names must start with capital letter, contain only letters).");
-                                            Console.ForegroundColor = ConsoleColor.White;
-                                            continue;
-                                        }
-
-                                        // Check for duplicate ID in existing records
-                                        duplicate = false;
-                                        foreach (string existingRecord in existingRecords)
-                                        {
-                                            if (existingRecord.StartsWith(id + ","))
-                                            {
-                                                duplicate = true;
-                                                break;
-                                            }
-                                        }
-
-                                        // Check for duplicate ID in current bulk operation
-                                        if (currentBulkIDs.Contains(id))
-                                        {
-                                            duplicate = true;
-                                        }
-
-                                        if (duplicate)
-                                        {
-                                            skipped++;
-                                            Console.ForegroundColor = ConsoleColor.Red;
-                                            Console.WriteLine($"Line {i + 1} skipped: Duplicate student ID ({id}).");
-                                            Console.ForegroundColor = ConsoleColor.White;
-                                            continue;
-                                        }
-
-                                        // Parse and validate grades
-                                        g1Valid = double.TryParse(g1, out grade1);
-                                        g2Valid = double.TryParse(g2, out grade2);
-                                        g3Valid = double.TryParse(g3, out grade3);
-
-                                        if (!g1Valid || !g2Valid || !g3Valid)
-                                        {
-                                            skipped++;
-                                            Console.ForegroundColor = ConsoleColor.Red;
-                                            Console.WriteLine($"Line {i + 1} skipped: Invalid grade format (grades must be numbers).");
-                                            Console.ForegroundColor = ConsoleColor.White;
-                                            continue;
-                                        }
-
-                                        // Validate grade range (70-100)
-                                        if (grade1 < 70 || grade1 > 100 || grade2 < 70 || grade2 > 100 || grade3 < 70 || grade3 > 100)
-                                        {
-                                            skipped++;
-                                            Console.ForegroundColor = ConsoleColor.Red;
-                                            Console.WriteLine($"Line {i + 1} skipped: Grades must be between 70-100.");
-                                            Console.ForegroundColor = ConsoleColor.White;
-                                            continue;
-                                        }
-
-                                        // All validations passed - add the record
-                                        record = $"{id},{lastName},{firstName},{grade1},{grade2},{grade3}";
-
-                                        try
-                                        {
-                                            // Ensure directory exists before writing
-                                           directory = Path.GetDirectoryName(dataPath);
-                                            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
-                                            {
-                                                Directory.CreateDirectory(directory);
-                                            }
-
-                                            File.AppendAllText(dataPath, record + "\n"); // Append the record to the CSV file
-
-                                            // Add to tracking collections
-                                            studentIDs.Add(id);
-                                            studentLastNames.Add(lastName);
-                                            studentFirstNames.Add(firstName);
-                                            currentBulkIDs.Add(id);
-
-                                            added++;
-                                            Console.ForegroundColor = ConsoleColor.Green;
-                                            Console.WriteLine($"Line {i + 1} added: {lastName}, {firstName} ({id})");
-                                            Console.ForegroundColor = ConsoleColor.White;
-                                        }
-                                        catch (UnauthorizedAccessException)
-                                        {
-                                            Console.ForegroundColor = ConsoleColor.Red;
-                                            Console.WriteLine($"Line {i + 1} skipped: Access denied while saving record.");
-                                            Console.ForegroundColor = ConsoleColor.White;
-                                            skipped++;
-                                        }
-                                        catch (IOException ex)
-                                        {
-                                            Console.ForegroundColor = ConsoleColor.Red;
-                                            Console.WriteLine($"Line {i + 1} skipped: Error saving record - {ex.Message}");
-                                            Console.ForegroundColor = ConsoleColor.White;
-                                            skipped++;
-                                        }
-                                    }
-                                    else
-                                    {
-                                        skipped++;
-                                        Console.ForegroundColor = ConsoleColor.Red;
-                                        Console.WriteLine($"Line {i + 1} skipped: Incorrect format (expecting 6 fields: ID,LastName,FirstName,Grade1,Grade2,Grade3).");
-                                        Console.ForegroundColor = ConsoleColor.White;
-                                    }
+                                    skipped++;
+                                    Console.ForegroundColor = ConsoleColor.Red;
+                                    Console.WriteLine($"\nLine {i + 1} skipped: Incorrect format.");
+                                    Console.ForegroundColor = ConsoleColor.White;
+                                    continue;
                                 }
 
-                                // Sort the records after adding all new ones
-                                if (added > 0)
+                                id = parts[0].Trim();
+                                lastName = parts[1].Trim();
+                                firstName = parts[2].Trim();
+                                g1 = parts[3].Trim();
+                                g2 = parts[4].Trim();
+                                g3 = parts[5].Trim();
+
+                                idValid = id.Length == 7 && id.StartsWith("IT1") && char.IsLetter(id[3]) &&
+                                          char.IsDigit(id[4]) && char.IsDigit(id[5]) && char.IsDigit(id[6]);
+
+                                if (!idValid)
                                 {
-                                    try
-                                    {
-                                        allRecords = File.ReadAllLines(dataPath);
-                                        Array.Sort(allRecords);
-                                        File.WriteAllLines(dataPath, allRecords);
-                                    }
-                                    catch (IOException ex)
-                                    {
-                                        Console.ForegroundColor = ConsoleColor.Yellow;
-                                        Console.WriteLine($"Warning: Unable to sort records - {ex.Message}");
-                                        Console.ForegroundColor = ConsoleColor.White;
-                                    }
+                                    skipped++;
+                                    Console.ForegroundColor = ConsoleColor.Red;
+                                    Console.WriteLine($"\nLine {i + 1} skipped: Invalid ID.");
+                                    Console.ForegroundColor = ConsoleColor.White;
+                                    continue;
                                 }
 
-                                Console.ForegroundColor = ConsoleColor.Green;
-                                Console.WriteLine($"\nBulk import completed!");
-                                Console.ForegroundColor = ConsoleColor.DarkGreen;
-                                Console.WriteLine($"\nSuccessfully added: {added} records");
-                                Console.ForegroundColor = ConsoleColor.DarkRed;
-                                Console.WriteLine($"Skipped: {skipped} records");
-                                Console.ForegroundColor = ConsoleColor.White;
+                                nameValid = !string.IsNullOrWhiteSpace(lastName) && !lastName.Any(char.IsDigit) &&
+                                            char.IsUpper(lastName[0]) && lastName.Substring(1) == lastName.Substring(1).ToLower() &&
+                                            !string.IsNullOrWhiteSpace(firstName) && !firstName.Any(char.IsDigit) &&
+                                            char.IsUpper(firstName[0]) && firstName.Substring(1) == firstName.Substring(1).ToLower();
+
+                                if (!nameValid)
+                                {
+                                    skipped++;
+                                    Console.ForegroundColor = ConsoleColor.Red;
+                                    Console.WriteLine($"\nLine {i + 1} skipped: Invalid name.");
+                                    Console.ForegroundColor = ConsoleColor.White;
+                                    continue;
+                                }
+
+                                duplicate = existingRecords.Any(r => r.StartsWith(id + ",")) || currentBulkIDs.Contains(id);
+                                if (duplicate)
+                                {
+                                    skipped++;
+                                    Console.ForegroundColor = ConsoleColor.Red;
+                                    Console.WriteLine($"\nLine {i + 1} skipped: Duplicate ID.");
+                                    Console.ForegroundColor = ConsoleColor.White;
+                                    continue;
+                                }
+
+                                g1Valid = double.TryParse(g1, out grade1);
+                                g2Valid = double.TryParse(g2, out grade2);
+                                g3Valid = double.TryParse(g3, out grade3);
+
+                                if (!g1Valid || !g2Valid || !g3Valid ||
+                                    grade1 < 70 || grade1 > 100 || grade2 < 70 || grade2 > 100 || grade3 < 70 || grade3 > 100)
+                                {
+                                    skipped++;
+                                    Console.ForegroundColor = ConsoleColor.Red;
+                                    Console.WriteLine($"\nLine {i + 1} skipped: Invalid grade.");
+                                    Console.ForegroundColor = ConsoleColor.White;
+                                    continue;
+                                }
+
+                                // Guard against short IDs before substring
+                                if (id.Length < 4)
+                                {
+                                    skipped++;
+                                    Console.ForegroundColor = ConsoleColor.Red;
+                                    Console.WriteLine($"\nLine {i + 1} skipped: ID too short to determine section.");
+                                    Console.ForegroundColor = ConsoleColor.White;
+                                    continue;
+                                }
+
+                                record = $"{id},{lastName},{firstName},{grade1},{grade2},{grade3}";
+
+                                try
+                                {
+                                    directory = Path.GetDirectoryName(dataPath);
+                                    if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+                                        Directory.CreateDirectory(directory);
+
+                                    File.AppendAllText(dataPath, record + "\n");
+
+                                    section = id.Substring(3, 1).ToUpper();
+                                    sectionFolder = Path.Combine("Sections", $"Section{section}");
+                                    sectionFile = Path.Combine(sectionFolder, "grades.csv");
+
+                                    if (!Directory.Exists(sectionFolder))
+                                        Directory.CreateDirectory(sectionFolder);
+
+                                    File.AppendAllText(sectionFile, record + "\n");
+
+                                    studentIDs.Add(id);
+                                    studentLastNames.Add(lastName);
+                                    studentFirstNames.Add(firstName);
+                                    currentBulkIDs.Add(id);
+
+                                    added++;
+                                    Console.ForegroundColor = ConsoleColor.Green;
+                                    Console.WriteLine($"\nLine {i + 1} added: {lastName}, {firstName} ({id})");
+                                    Console.ForegroundColor = ConsoleColor.White;
+                                }
+                                catch (IOException ex)
+                                {
+                                    Console.ForegroundColor = ConsoleColor.Red;
+                                    Console.WriteLine($"\nLine {i + 1} skipped: Error saving record - {ex.Message}");
+                                    Console.ForegroundColor = ConsoleColor.White;
+                                    skipped++;
+                                }
                             }
-                            catch (IOException ex)
+
+                            if (added > 0)
                             {
-                                Console.ForegroundColor = ConsoleColor.Red;
-                                Console.WriteLine($"Error reading bulk import file: {ex.Message}");
-                                Console.ForegroundColor = ConsoleColor.White;
+                                try
+                                {
+                                    allRecords = File.ReadAllLines(dataPath);
+                                    Array.Sort(allRecords);
+                                    File.WriteAllLines(dataPath, allRecords);
+
+                                    sectionMap = new Dictionary<string, List<string>>();
+
+                                    foreach (string rec in allRecords)
+                                    {
+                                        string recID = rec.Split(',')[0];
+                                        if (recID.Length >= 4)
+                                        {
+                                            string sec = recID.Substring(3, 1).ToUpper();
+                                            if (!sectionMap.ContainsKey(sec))
+                                                sectionMap[sec] = new List<string>();
+                                            sectionMap[sec].Add(rec);
+                                        }
+                                    }
+
+                                    foreach (var kvp in sectionMap)
+                                    {
+                                        sectionDir = Path.Combine("Sections", $"Section{kvp.Key}");
+                                        sectionCsv = Path.Combine(sectionDir, "grades.csv");
+
+                                        if (!Directory.Exists(sectionDir))
+                                            Directory.CreateDirectory(sectionDir);
+
+                                        kvp.Value.Sort();
+                                        File.WriteAllLines(sectionCsv, kvp.Value);
+                                    }
+                                }
+                                catch (IOException ex)
+                                {
+                                    Console.ForegroundColor = ConsoleColor.Yellow;
+                                    Console.WriteLine($"Warning: Unable to sort final records - {ex.Message}");
+                                    Console.ForegroundColor = ConsoleColor.White;
+                                }
                             }
-                            catch (UnauthorizedAccessException)
-                            {
-                                Console.ForegroundColor = ConsoleColor.Red;
-                                Console.WriteLine("Access denied: Unable to read the bulk import file. Please check file permissions.");
-                                Console.ForegroundColor = ConsoleColor.White;
-                            }
+
+                            Console.ForegroundColor = ConsoleColor.Green;
+                            Console.WriteLine($"\nBulk import completed!");
+                            Console.ForegroundColor = ConsoleColor.DarkGreen;
+                            Console.WriteLine($"\nSuccessfully added: {added} record(s)");
+                            Console.ForegroundColor = ConsoleColor.DarkRed;
+                            Console.WriteLine($"\nSkipped: {skipped} record(s)");
+                            Console.ForegroundColor = ConsoleColor.White;
                         }
-                        catch (Exception ex)
+                        catch (Exception)
                         {
                             Console.ForegroundColor = ConsoleColor.Red;
-                            Console.WriteLine($"Unexpected error during bulk import: {ex.Message}");
+                            Console.WriteLine("\nBulk import failed due to an unexpected error.");
+                            Console.WriteLine("Please check the CSV format and try again.");
                             Console.ForegroundColor = ConsoleColor.White;
                         }
                         break;
+
+
 
                     case "3": // Export all students
                         try
