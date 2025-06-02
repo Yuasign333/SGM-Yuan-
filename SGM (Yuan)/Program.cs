@@ -88,6 +88,10 @@ class Program
 
         string sectionReportDir; // Directory path for section report files
 
+        string recID; // Record the Id
+
+        string sec; // Record the Section
+
         // ----- Double Variables -----
 
         double grade1; // Data Structures grade input
@@ -675,10 +679,10 @@ class Program
 
                                     foreach (string rec in allRecords)
                                     {
-                                        string recID = rec.Split(',')[0];
+                                        recID = rec.Split(',')[0];
                                         if (recID.Length >= 4)
                                         {
-                                            string sec = recID.Substring(3, 1).ToUpper();
+                                            sec = recID.Substring(3, 1).ToUpper();
                                             if (!sectionMap.ContainsKey(sec))
                                                 sectionMap[sec] = new List<string>();
                                             sectionMap[sec].Add(rec);
